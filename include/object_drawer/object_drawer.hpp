@@ -79,6 +79,7 @@ private:
       }
 
       // validate objects
+      // TODO: allow size mismatch between names, contours, and probabilities
       if (object_msg->names.size() != object_msg->contours.size()) {
         NODELET_ERROR("Invalid objects");
         return;
@@ -113,6 +114,8 @@ private:
                               rect.y + (rect.height + text_size.height) / 2),
                     cv::FONT_HERSHEY_SIMPLEX, font_scale_, CV_RGB(255, 255, 255), text_tickness_);
       }
+
+      // TODO: draw probabilities
 
       // publish annotated image
       image_publisher_.publish(image->toImageMsg());
