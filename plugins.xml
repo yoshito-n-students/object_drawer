@@ -1,0 +1,5 @@
+<library path="lib/libobject_drawer">
+    <class name="object_drawer/ObjectDrawer" type="object_drawer::ObjectDrawer" base_class_type="nodelet::Nodelet">
+        <description>draw result of object detection on images</description>
+    </class>
+</library>
