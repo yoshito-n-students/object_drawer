@@ -12,13 +12,13 @@
 #include <message_filters/time_synchronizer.h>
 #include <nodelet/nodelet.h>
 #include <object_detection_msgs/Objects.h>
+#include <object_detection_msgs/cv_conversions.hpp>
 #include <ros/node_handle.h>
 #include <sensor_msgs/Image.h>
 
 #include <opencv2/core.hpp>
 #include <opencv2/imgproc.hpp>
 
-#include <boost/foreach.hpp>
 #include <boost/scoped_ptr.hpp>
 
 namespace object_drawer {
@@ -89,14 +89,8 @@ private:
       image->image /= 2;
 
       // extract contours from message
-      std::vector< std::vector< cv::Point > > contours;
-      BOOST_FOREACH (const object_detection_msgs::Points &points_msg, object_msg->contours) {
-        std::vector< cv::Point > points;
-        BOOST_FOREACH (const object_detection_msgs::Point &point_msg, points_msg.points) {
-          points.push_back(cv::Point(point_msg.x, point_msg.y));
-        }
-        contours.push_back(points);
-      }
+      const std::vector< std::vector< cv::Point > > contours(
+          object_detection_msgs::toCvContours(object_msg->contours));
 
       // draw contours in red
       cv::polylines(image->image, contours,
