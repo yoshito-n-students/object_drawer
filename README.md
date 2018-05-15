@@ -22,11 +22,20 @@ image_out (sensor_msgs/Image)
 ~queue_size (int, default: 10)
 * queue size of a synchronizer for subscribed images and objects
 
+~pixel_scale (double, default: 0.5)
+* scaling factor for base image pixels(colors) applied before drawing objects
+
 ~line_tickness (int, default: 3)
 * tickness of detected objects' contours in published images
 
+~line_color (int[3], default: [ 255, 0, 0 ])
+* color of detected objects' contours in published images
+
 ~text_tickness (int, defalut: 2)
 * tickness of detected objects' names in published images
+
+~text_color (int[3], default: [ 255, 255, 255 ])
+* color of detected objects' names in published images
 
 ~font_scale (double, default: 0.8)
 * font size of detected objects' names in published images
