@@ -42,3 +42,6 @@ image_out (sensor_msgs/Image)
 
 ~image_transport (string, default: "raw")
 * transport type of the subscribed image topic
+
+## Examples
+see [launch/test.launch](launch/test.launch)
