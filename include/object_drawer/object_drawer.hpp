@@ -38,8 +38,11 @@ public:
 
     // load params
     const int queue_size(pnh.param("queue_size", 10));
+    pixel_scale_ = pnh.param("pixel_scale", 0.5);
     line_tickness_ = pnh.param("line_tickness", 3);
+    line_color_ = colorParam(pnh, "line_color", CV_RGB(255, 0, 0));
     text_tickness_ = pnh.param("text_tickness", 2);
+    text_color_ = colorParam(pnh, "text_color", CV_RGB(255, 255, 255));
     font_scale_ = pnh.param("font_scale", 0.8);
     // TODO: line & text colors as parameters
 
@@ -78,38 +81,47 @@ private:
         return;
       }
 
-      // validate objects
-      // TODO: allow size mismatch between names, contours, and probabilities
-      if (object_msg->names.size() != object_msg->contours.size()) {
-        NODELET_ERROR("Invalid objects");
-        return;
+      // scale the original image pixels (usually darken to emphasize objects)
+      image->image *= pixel_scale_;
+
+      // draw each object
+      const std::size_t n_objects(
+          std::max(std::max(object_msg->names.size(), object_msg->probabilities.size()),
+                   object_msg->contours.size()));
+      for (std::size_t i = 0; i < n_objects; ++i) {
+        // extract an object
+        const std::string name(i < object_msg->names.size() ? object_msg->names[i] : std::string());
+        const double probability(i < object_msg->probabilities.size() ? object_msg->probabilities[i]
+                                                                      : -1.);
+        const std::vector< cv::Point > contour(
+            i < object_msg->contours.size()
+                ? object_detection_msgs::toCvPoints(object_msg->contours[i])
+                : std::vector< cv::Point >());
+
+        // draw contour
+        if (contour.size() >= 2) {
+          cv::polylines(image->image, std::vector< std::vector< cv::Point > >(1, contour),
+                        true /* is_closed (e.g. draw line from last to first point) */, line_color_,
+                        line_tickness_);
+        }
+
+        // draw the name at the center of corresponding contour
+        if (!name.empty()) {
+          const cv::Rect rect(cv::boundingRect(contour));
+          const cv::Size text_size(cv::getTextSize(name, cv::FONT_HERSHEY_SIMPLEX, font_scale_,
+                                                   text_tickness_,
+                                                   NULL /* baseline (won't use) */));
+          cv::putText(image->image, name,
+                      cv::Point(rect.x + (rect.width - text_size.width) / 2,
+                                rect.y + (rect.height + text_size.height) / 2),
+                      cv::FONT_HERSHEY_SIMPLEX, font_scale_, text_color_, text_tickness_);
+        }
+
+        // draw probability
+        if (probability >= 0. && probability <= 1.) {
+          // TODO: draw probabilities
+        }
       }
-
-      // dark the original image to emphasize objects
-      image->image /= 2;
-
-      // extract contours from message
-      const std::vector< std::vector< cv::Point > > contours(
-          object_detection_msgs::toCvContours(object_msg->contours));
-
-      // draw contours in red
-      cv::polylines(image->image, contours,
-                    true /* is_closed (e.g. draw line from last to first point) */,
-                    CV_RGB(255, 0, 0), line_tickness_);
-
-      // draw names in white at the center of corresponding contours
-      for (std::size_t i = 0; i < object_msg->names.size(); ++i) {
-        const cv::Rect rect(cv::boundingRect(contours[i]));
-        const cv::Size text_size(cv::getTextSize(object_msg->names[i], cv::FONT_HERSHEY_SIMPLEX,
-                                                 font_scale_, text_tickness_,
-                                                 NULL /* baseline (won't use) */));
-        cv::putText(image->image, object_msg->names[i],
-                    cv::Point(rect.x + (rect.width - text_size.width) / 2,
-                              rect.y + (rect.height + text_size.height) / 2),
-                    cv::FONT_HERSHEY_SIMPLEX, font_scale_, CV_RGB(255, 255, 255), text_tickness_);
-      }
-
-      // TODO: draw probabilities
 
       // publish annotated image
       image_publisher_.publish(image->toImageMsg());
@@ -119,8 +131,34 @@ private:
     }
   }
 
+  // utility function to load RGB color parameter
+  // (this function cannot be static member function due to NODELET_XXX macros)
+  cv::Scalar colorParam(ros::NodeHandle &nh, const std::string &name,
+                        const cv::Scalar &default_val) {
+    std::vector< int > val;
+    if (!nh.getParam(name, val)) {
+      return default_val;
+    }
+
+    if (val.size() < 3) {
+      NODELET_ERROR_STREAM("Element size of " << nh.resolveName(name)
+                                              << " is less than 3. Will use the default color.");
+      return default_val;
+    }
+
+    if (val.size() > 3) {
+      NODELET_WARN_STREAM("Element size of "
+                          << nh.resolveName(name)
+                          << " is greater than 3. Only 1st to 3rd elements will be used.");
+    }
+
+    return CV_RGB(val[0], val[1], val[2]);
+  }
+
 private:
+  double pixel_scale_;
   int line_tickness_, text_tickness_;
+  cv::Scalar line_color_, text_color_;
   double font_scale_;
 
   image_transport::SubscriberFilter image_subscriber_;
