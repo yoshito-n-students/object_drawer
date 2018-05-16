@@ -38,13 +38,15 @@ public:
 
     // load params
     const int queue_size(pnh.param("queue_size", 10));
-    pixel_scale_ = pnh.param("pixel_scale", 0.5);
+    base_color_ = colorParam(pnh, "base_color", CV_RGB(0, 0, 0));
+    image_transparency_ = pnh.param("image_transparency", 0.5);
     line_tickness_ = pnh.param("line_tickness", 3);
     line_color_ = colorParam(pnh, "line_color", CV_RGB(255, 0, 0));
+    line_transparency_ = pnh.param("line_transparency", 0.);
     text_tickness_ = pnh.param("text_tickness", 2);
     text_color_ = colorParam(pnh, "text_color", CV_RGB(255, 255, 255));
+    text_transparency_ = pnh.param("text_transparency", 0.);
     font_scale_ = pnh.param("font_scale", 0.8);
-    // TODO: line & text colors as parameters
 
     // annotated image publisher
     image_transport::ImageTransport it(nh);
@@ -71,60 +73,62 @@ private:
 
       // received message to opencv image
       // (desired encoding of opencv's drawering functions is bgr8)
-      const cv_bridge::CvImagePtr image(cv_bridge::toCvCopy(image_msg, "bgr8"));
-      if (!image) {
+      const cv_bridge::CvImagePtr image_in(cv_bridge::toCvCopy(image_msg, "bgr8"));
+      if (!image_in) {
         NODELET_ERROR("Image conversion error");
         return;
       }
-      if (image->image.empty()) {
+      if (image_in->image.empty()) {
         NODELET_ERROR("Empty image message");
         return;
       }
 
-      // scale the original image pixels (usually darken to emphasize objects)
-      image->image *= pixel_scale_;
+      // create output image filled with the base color
+      cv_bridge::CvImage image_out(
+          image_in->header, image_in->encoding,
+          cv::Mat(image_in->image.size(), image_in->image.type(), base_color_));
 
-      // draw each object
-      const std::size_t n_objects(
-          std::max(std::max(object_msg->names.size(), object_msg->probabilities.size()),
-                   object_msg->contours.size()));
-      for (std::size_t i = 0; i < n_objects; ++i) {
-        // extract an object
-        const std::string name(i < object_msg->names.size() ? object_msg->names[i] : std::string());
-        const double probability(i < object_msg->probabilities.size() ? object_msg->probabilities[i]
-                                                                      : -1.);
+      // overlay the subscribed image on the output image
+      overlay(image_out.image, image_in->image, image_transparency_,
+              cv::Mat::ones(image_in->image.size(), CV_8UC1));
+
+      // overlay the subscribed contours on the output image
+      cv::Mat contours_mask(cv::Mat::zeros(image_in->image.size(), CV_8UC1));
+      for (std::size_t i = 0; i < object_msg->contours.size(); ++i) {
         const std::vector< cv::Point > contour(
-            i < object_msg->contours.size()
-                ? object_detection_msgs::toCvPoints(object_msg->contours[i])
-                : std::vector< cv::Point >());
-
-        // draw contour
+            object_detection_msgs::toCvPoints(object_msg->contours[i]));
         if (contour.size() >= 2) {
-          cv::polylines(image->image, std::vector< std::vector< cv::Point > >(1, contour),
-                        true /* is_closed (e.g. draw line from last to first point) */, line_color_,
+          cv::polylines(contours_mask, std::vector< std::vector< cv::Point > >(1, contour),
+                        true /* is_closed (e.g. draw line from last to first point) */, 1,
                         line_tickness_);
         }
+      }
+      overlay(image_out.image, cv::Mat(image_in->image.size(), image_in->image.type(), line_color_),
+              line_transparency_, contours_mask);
 
-        // draw the name at the center of corresponding contour
-        if (!name.empty()) {
+      // overlay the subscribed name texts on the output image
+      const std::size_t n_texts(std::min(object_msg->contours.size(), object_msg->names.size()));
+      cv::Mat text_mask(cv::Mat::zeros(image_in->image.size(), CV_8UC1));
+      for (std::size_t i = 0; i < n_texts; ++i) {
+        const std::string text(object_msg->names[i]); // TODO: add probability to text
+        const std::vector< cv::Point > contour(
+            object_detection_msgs::toCvPoints(object_msg->contours[i]));
+        if (!text.empty() && !contour.empty()) {
           const cv::Rect rect(cv::boundingRect(contour));
-          const cv::Size text_size(cv::getTextSize(name, cv::FONT_HERSHEY_SIMPLEX, font_scale_,
+          const cv::Size text_size(cv::getTextSize(text, cv::FONT_HERSHEY_SIMPLEX, font_scale_,
                                                    text_tickness_,
                                                    NULL /* baseline (won't use) */));
-          cv::putText(image->image, name,
+          cv::putText(text_mask, text,
                       cv::Point(rect.x + (rect.width - text_size.width) / 2,
                                 rect.y + (rect.height + text_size.height) / 2),
-                      cv::FONT_HERSHEY_SIMPLEX, font_scale_, text_color_, text_tickness_);
-        }
-
-        // draw probability
-        if (probability >= 0. && probability <= 1.) {
-          // TODO: draw probabilities
+                      cv::FONT_HERSHEY_SIMPLEX, font_scale_, 1, text_tickness_);
         }
       }
+      overlay(image_out.image, cv::Mat(image_in->image.size(), image_in->image.type(), text_color_),
+              text_transparency_, text_mask);
 
       // publish annotated image
-      image_publisher_.publish(image->toImageMsg());
+      image_publisher_.publish(image_out.toImageMsg());
 
     } catch (const std::exception &error) {
       NODELET_ERROR_STREAM(error.what());
@@ -155,10 +159,17 @@ private:
     return CV_RGB(val[0], val[1], val[2]);
   }
 
+  // utility function to overlay images
+  static void overlay(cv::Mat &image, const cv::Mat &layer_image, const double layer_transparency,
+                      const cv::Mat &layer_mask) {
+    const cv::Mat full_image(layer_transparency * image + (1. - layer_transparency) * layer_image);
+    full_image.copyTo(image, layer_mask);
+  }
+
 private:
-  double pixel_scale_;
+  cv::Scalar base_color_, line_color_, text_color_;
+  double image_transparency_, line_transparency_, text_transparency_;
   int line_tickness_, text_tickness_;
-  cv::Scalar line_color_, text_color_;
   double font_scale_;
 
   image_transport::SubscriberFilter image_subscriber_;
