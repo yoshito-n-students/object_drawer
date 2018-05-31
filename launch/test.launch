@@ -1,0 +1,46 @@
+<launch>
+    <!-- -->
+    <!-- object drawing node -->
+    <node name="drawing_node" pkg="nodelet" type="nodelet" args="manager drawing_node" output="screen"/>
+    <!-- -->
+    <!-- object publisher loader -->
+    <node name="object_publisher_loader" pkg="nodelet" type="nodelet"
+          args="load object_detection_msgs/SynchronizedObjectPublisher drawing_node" output="screen">
+        <remap from="objects_out" to="objects"/>
+        <rosparam>
+            subscribe_image: true
+            names:
+                - "square"
+                - "triangle"
+                - "text"
+                - "" #line
+            contours:
+                - [ [ 0, 0 ], [ 0, 100 ], [ 100, 100 ], [ 100, 0 ] ]
+                - [ [ 150, 150 ], [ 100, 200 ], [ 200, 200 ] ]
+                - [ [ 250, 50 ] ]
+                - [ [ 300, 100 ], [ 250, 200 ] ]
+        </rosparam>
+    </node>
+    <!-- -->
+    <!-- object drawer loader -->
+    <node name="object_drawer_loader" pkg="nodelet" type="nodelet"
+          args="load object_drawer/ObjectDrawer drawing_node" output="screen">
+        <remap from="objects_in" to="objects"/>
+        <remap from="image_out" to="object_image"/>
+        <rosparam>
+            base_color: [ 0, 0, 0 ]
+            image_transparency: 0.3
+            line_tickness: 2
+            line_color: [ 0, 255, 0 ]
+            line_transparency: 0.5
+            text_tickness: 1
+            text_color: [ 255, 255, 255 ]
+            text_transparency: 0.5
+        </rosparam>
+    </node>
+    <!-- -->
+    <!-- object view -->
+    <node name="object_viewer" pkg="image_view" type="image_view" output="screen">
+        <remap from="image" to="object_image"/>
+    </node>
+</launch>

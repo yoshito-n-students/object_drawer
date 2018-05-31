@@ -16,20 +16,42 @@ objects_in (object_detection_msgs/Objects)
 ## Published Topics
 image_out (sensor_msgs/Image)
 * annotated image showing contours and names of detected objects
+* consisits of 4 layers; single-colored image (bottom), subscribed image, objects' contours, and texts (top)
 * subtopics supported by image_transport are also published
 
 ## Parameters
 ~queue_size (int, default: 10)
 * queue size of a synchronizer for subscribed images and objects
 
+~base_color (int[3], default: [ 0, 0, 0 ])
+* color of the lowest layer of a published image
+
+~image_transparency (double, default: 0.5)
+* transparency of subscribed image layers in published images
+
 ~line_tickness (int, default: 3)
-* tickness of detected objects' contours in published images
+* tickness of subscribed objects' contours in published images
+
+~line_color (int[3], default: [ 255, 0, 0 ])
+* color of subscribed objects' contours in published images
+
+~line_transparency (double, default: 0.0)
+* transparency of subscribed objects' contours in published images
 
 ~text_tickness (int, defalut: 2)
-* tickness of detected objects' names in published images
+* tickness of subscribed objects' names in published images
+
+~text_color (int[3], default: [ 255, 255, 255 ])
+* color of subscribed objects' names in published images
+
+~text_transparency (double, default: 0.0)
+* transparency of subscribed objects' names in published images
 
 ~font_scale (double, default: 0.8)
-* font size of detected objects' names in published images
+* font size of subscribed objects' names in published images
 
 ~image_transport (string, default: "raw")
 * transport type of the subscribed image topic
+
+## Examples
+see [launch/test.launch](launch/test.launch)
