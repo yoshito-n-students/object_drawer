@@ -162,7 +162,10 @@ private:
   // utility function to overlay images
   static void overlay(cv::Mat &image, const cv::Mat &layer_image, const double layer_transparency,
                       const cv::Mat &layer_mask) {
-    const cv::Mat full_image(layer_transparency * image + (1. - layer_transparency) * layer_image);
+    cv::Mat full_image;
+    // full_image = transparency*image + (1-transparency)*layer + 0
+    cv::addWeighted(image, layer_transparency, layer_image, 1. - layer_transparency, 0.,
+                    full_image);
     full_image.copyTo(image, layer_mask);
   }
 
