@@ -29,8 +29,8 @@ image_out (sensor_msgs/Image)
 ~image_transparency (double, default: 0.5)
 * transparency of subscribed image layers in published images
 
-~line_tickness (int, default: 3)
-* tickness of subscribed objects' contours in published images
+~line_thickness (int, default: 3)
+* thickness of subscribed objects' contours in published images
 
 ~line_color (int[3], default: [ 255, 0, 0 ])
 * color of subscribed objects' contours in published images
@@ -38,8 +38,8 @@ image_out (sensor_msgs/Image)
 ~line_transparency (double, default: 0.0)
 * transparency of subscribed objects' contours in published images
 
-~text_tickness (int, defalut: 2)
-* tickness of subscribed objects' names in published images
+~text_thickness (int, defalut: 2)
+* thickness of subscribed objects' names in published images
 
 ~text_color (int[3], default: [ 255, 255, 255 ])
 * color of subscribed objects' names in published images

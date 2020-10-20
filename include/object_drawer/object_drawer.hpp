@@ -19,6 +19,7 @@
 #include <opencv2/core.hpp>
 #include <opencv2/imgproc.hpp>
 
+#include <boost/foreach.hpp>
 #include <boost/scoped_ptr.hpp>
 
 namespace object_drawer {
@@ -40,10 +41,10 @@ public:
     const int queue_size(pnh.param("queue_size", 10));
     base_color_ = colorParam(pnh, "base_color", CV_RGB(0, 0, 0));
     image_transparency_ = pnh.param("image_transparency", 0.5);
-    line_tickness_ = pnh.param("line_tickness", 3);
+    line_thickness_ = pnh.param("line_thickness", 3);
     line_color_ = colorParam(pnh, "line_color", CV_RGB(255, 0, 0));
     line_transparency_ = pnh.param("line_transparency", 0.);
-    text_tickness_ = pnh.param("text_tickness", 2);
+    text_thickness_ = pnh.param("text_thickness", 2);
     text_color_ = colorParam(pnh, "text_color", CV_RGB(255, 255, 255));
     text_transparency_ = pnh.param("text_transparency", 0.);
     font_scale_ = pnh.param("font_scale", 0.8);
@@ -92,36 +93,37 @@ private:
       overlay(image_out.image, image_in->image, image_transparency_,
               cv::Mat::ones(image_in->image.size(), CV_8UC1));
 
-      // overlay the subscribed contours on the output image
+      // convert the subscribed contours to OpenCV's type
+      const std::vector< std::vector< cv::Point > > contours(
+          object_detection_msgs::toCvContours(object_msg->contours));
+
+      // overlay the contours on the output image
       cv::Mat contours_mask(cv::Mat::zeros(image_in->image.size(), CV_8UC1));
-      for (std::size_t i = 0; i < object_msg->contours.size(); ++i) {
-        const std::vector< cv::Point > contour(
-            object_detection_msgs::toCvPoints(object_msg->contours[i]));
+      BOOST_FOREACH (const std::vector< cv::Point > &contour, contours) {
         if (contour.size() >= 2) {
           cv::polylines(contours_mask, std::vector< std::vector< cv::Point > >(1, contour),
                         true /* is_closed (e.g. draw line from last to first point) */, 1,
-                        line_tickness_);
+                        line_thickness_);
         }
       }
       overlay(image_out.image, cv::Mat(image_in->image.size(), image_in->image.type(), line_color_),
               line_transparency_, contours_mask);
 
       // overlay the subscribed name texts on the output image
-      const std::size_t n_texts(std::min(object_msg->contours.size(), object_msg->names.size()));
+      const std::size_t n_texts(std::min(contours.size(), object_msg->names.size()));
       cv::Mat text_mask(cv::Mat::zeros(image_in->image.size(), CV_8UC1));
       for (std::size_t i = 0; i < n_texts; ++i) {
-        const std::string text(object_msg->names[i]); // TODO: add probability to text
-        const std::vector< cv::Point > contour(
-            object_detection_msgs::toCvPoints(object_msg->contours[i]));
+        const std::string &text(object_msg->names[i]); // TODO: add probability to text
+        const std::vector< cv::Point > &contour(contours[i]);
         if (!text.empty() && !contour.empty()) {
           const cv::Rect rect(cv::boundingRect(contour));
           const cv::Size text_size(cv::getTextSize(text, cv::FONT_HERSHEY_SIMPLEX, font_scale_,
-                                                   text_tickness_,
+                                                   text_thickness_,
                                                    NULL /* baseline (won't use) */));
           cv::putText(text_mask, text,
                       cv::Point(rect.x + (rect.width - text_size.width) / 2,
                                 rect.y + (rect.height + text_size.height) / 2),
-                      cv::FONT_HERSHEY_SIMPLEX, font_scale_, 1, text_tickness_);
+                      cv::FONT_HERSHEY_SIMPLEX, font_scale_, 1, text_thickness_);
         }
       }
       overlay(image_out.image, cv::Mat(image_in->image.size(), image_in->image.type(), text_color_),
@@ -162,14 +164,17 @@ private:
   // utility function to overlay images
   static void overlay(cv::Mat &image, const cv::Mat &layer_image, const double layer_transparency,
                       const cv::Mat &layer_mask) {
-    const cv::Mat full_image(layer_transparency * image + (1. - layer_transparency) * layer_image);
+    cv::Mat full_image;
+    // full_image = transparency*image + (1-transparency)*layer + 0
+    cv::addWeighted(image, layer_transparency, layer_image, 1. - layer_transparency, 0.,
+                    full_image);
     full_image.copyTo(image, layer_mask);
   }
 
 private:
   cv::Scalar base_color_, line_color_, text_color_;
   double image_transparency_, line_transparency_, text_transparency_;
-  int line_tickness_, text_tickness_;
+  int line_thickness_, text_thickness_;
   double font_scale_;
 
   image_transport::SubscriberFilter image_subscriber_;
