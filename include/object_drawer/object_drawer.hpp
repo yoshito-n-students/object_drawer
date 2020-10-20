@@ -19,6 +19,7 @@
 #include <opencv2/core.hpp>
 #include <opencv2/imgproc.hpp>
 
+#include <boost/foreach.hpp>
 #include <boost/scoped_ptr.hpp>
 
 namespace object_drawer {
@@ -92,11 +93,13 @@ private:
       overlay(image_out.image, image_in->image, image_transparency_,
               cv::Mat::ones(image_in->image.size(), CV_8UC1));
 
-      // overlay the subscribed contours on the output image
+      // convert the subscribed contours to OpenCV's type
+      const std::vector< std::vector< cv::Point > > contours(
+          object_detection_msgs::toCvContours(object_msg->contours));
+
+      // overlay the contours on the output image
       cv::Mat contours_mask(cv::Mat::zeros(image_in->image.size(), CV_8UC1));
-      for (std::size_t i = 0; i < object_msg->contours.size(); ++i) {
-        const std::vector< cv::Point > contour(
-            object_detection_msgs::toCvPoints(object_msg->contours[i]));
+      BOOST_FOREACH (const std::vector< cv::Point > &contour, contours) {
         if (contour.size() >= 2) {
           cv::polylines(contours_mask, std::vector< std::vector< cv::Point > >(1, contour),
                         true /* is_closed (e.g. draw line from last to first point) */, 1,
@@ -107,12 +110,11 @@ private:
               line_transparency_, contours_mask);
 
       // overlay the subscribed name texts on the output image
-      const std::size_t n_texts(std::min(object_msg->contours.size(), object_msg->names.size()));
+      const std::size_t n_texts(std::min(contours.size(), object_msg->names.size()));
       cv::Mat text_mask(cv::Mat::zeros(image_in->image.size(), CV_8UC1));
       for (std::size_t i = 0; i < n_texts; ++i) {
-        const std::string text(object_msg->names[i]); // TODO: add probability to text
-        const std::vector< cv::Point > contour(
-            object_detection_msgs::toCvPoints(object_msg->contours[i]));
+        const std::string &text(object_msg->names[i]); // TODO: add probability to text
+        const std::vector< cv::Point > &contour(contours[i]);
         if (!text.empty() && !contour.empty()) {
           const cv::Rect rect(cv::boundingRect(contour));
           const cv::Size text_size(cv::getTextSize(text, cv::FONT_HERSHEY_SIMPLEX, font_scale_,
