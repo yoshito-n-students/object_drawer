@@ -30,10 +30,10 @@
         <rosparam>
             base_color: [ 0, 0, 0 ]
             image_transparency: 0.3
-            line_tickness: 2
+            line_thickness: 2
             line_color: [ 0, 255, 0 ]
             line_transparency: 0.5
-            text_tickness: 1
+            text_thickness: 1
             text_color: [ 255, 255, 255 ]
             text_transparency: 0.5
         </rosparam>

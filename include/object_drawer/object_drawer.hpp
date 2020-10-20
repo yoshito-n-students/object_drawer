@@ -41,10 +41,10 @@ public:
     const int queue_size(pnh.param("queue_size", 10));
     base_color_ = colorParam(pnh, "base_color", CV_RGB(0, 0, 0));
     image_transparency_ = pnh.param("image_transparency", 0.5);
-    line_tickness_ = pnh.param("line_tickness", 3);
+    line_thickness_ = pnh.param("line_thickness", 3);
     line_color_ = colorParam(pnh, "line_color", CV_RGB(255, 0, 0));
     line_transparency_ = pnh.param("line_transparency", 0.);
-    text_tickness_ = pnh.param("text_tickness", 2);
+    text_thickness_ = pnh.param("text_thickness", 2);
     text_color_ = colorParam(pnh, "text_color", CV_RGB(255, 255, 255));
     text_transparency_ = pnh.param("text_transparency", 0.);
     font_scale_ = pnh.param("font_scale", 0.8);
@@ -103,7 +103,7 @@ private:
         if (contour.size() >= 2) {
           cv::polylines(contours_mask, std::vector< std::vector< cv::Point > >(1, contour),
                         true /* is_closed (e.g. draw line from last to first point) */, 1,
-                        line_tickness_);
+                        line_thickness_);
         }
       }
       overlay(image_out.image, cv::Mat(image_in->image.size(), image_in->image.type(), line_color_),
@@ -118,12 +118,12 @@ private:
         if (!text.empty() && !contour.empty()) {
           const cv::Rect rect(cv::boundingRect(contour));
           const cv::Size text_size(cv::getTextSize(text, cv::FONT_HERSHEY_SIMPLEX, font_scale_,
-                                                   text_tickness_,
+                                                   text_thickness_,
                                                    NULL /* baseline (won't use) */));
           cv::putText(text_mask, text,
                       cv::Point(rect.x + (rect.width - text_size.width) / 2,
                                 rect.y + (rect.height + text_size.height) / 2),
-                      cv::FONT_HERSHEY_SIMPLEX, font_scale_, 1, text_tickness_);
+                      cv::FONT_HERSHEY_SIMPLEX, font_scale_, 1, text_thickness_);
         }
       }
       overlay(image_out.image, cv::Mat(image_in->image.size(), image_in->image.type(), text_color_),
@@ -174,7 +174,7 @@ private:
 private:
   cv::Scalar base_color_, line_color_, text_color_;
   double image_transparency_, line_transparency_, text_transparency_;
-  int line_tickness_, text_tickness_;
+  int line_thickness_, text_thickness_;
   double font_scale_;
 
   image_transport::SubscriberFilter image_subscriber_;
