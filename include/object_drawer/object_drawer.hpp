@@ -1,6 +1,7 @@
 #ifndef OBEJCT_DRAWER_OBJECT_DRAWER_HPP
 #define OBJECT_DRAWER_OBJECT_DRAWER_HPP
 
+#include <memory>
 #include <stdexcept>
 #include <vector>
 
@@ -19,26 +20,23 @@
 #include <opencv2/core.hpp>
 #include <opencv2/imgproc.hpp>
 
-#include <boost/foreach.hpp>
-#include <boost/scoped_ptr.hpp>
-
 namespace object_drawer {
 
 class ObjectDrawer : public nodelet::Nodelet {
 private:
-  typedef message_filters::TimeSynchronizer< sensor_msgs::Image, object_detection_msgs::Objects >
-      SyncSubscriber;
+  using SyncSubscriber =
+      message_filters::TimeSynchronizer<sensor_msgs::Image, object_detection_msgs::Objects>;
 
 public:
   ObjectDrawer() {}
   virtual ~ObjectDrawer() {}
 
   virtual void onInit() {
-    ros::NodeHandle &nh(getNodeHandle());
-    ros::NodeHandle &pnh(getPrivateNodeHandle());
+    ros::NodeHandle &nh = getNodeHandle();
+    ros::NodeHandle &pnh = getPrivateNodeHandle();
 
     // load params
-    const int queue_size(pnh.param("queue_size", 10));
+    const int queue_size = pnh.param("queue_size", 10);
     base_color_ = colorParam(pnh, "base_color", CV_RGB(0, 0, 0));
     image_transparency_ = pnh.param("image_transparency", 0.5);
     line_thickness_ = pnh.param("line_thickness", 3);
@@ -68,13 +66,13 @@ private:
                           const object_detection_msgs::ObjectsConstPtr &object_msg) {
     try {
       // process the received message on demand
-      if (image_publisher_.getNumSubscribers() == 0) {
+      if (image_publisher_.getNumSubscribers() <= 0) {
         return;
       }
 
       // received message to opencv image
       // (desired encoding of opencv's drawering functions is bgr8)
-      const cv_bridge::CvImagePtr image_in(cv_bridge::toCvCopy(image_msg, "bgr8"));
+      const cv_bridge::CvImagePtr image_in = cv_bridge::toCvCopy(image_msg, "bgr8");
       if (!image_in) {
         NODELET_ERROR("Image conversion error");
         return;
@@ -94,14 +92,14 @@ private:
               cv::Mat::ones(image_in->image.size(), CV_8UC1));
 
       // convert the subscribed contours to OpenCV's type
-      const std::vector< std::vector< cv::Point > > contours(
-          object_detection_msgs::toCvContours(object_msg->contours));
+      const std::vector<std::vector<cv::Point>> contours =
+          object_detection_msgs::toCvContours(object_msg->contours);
 
       // overlay the contours on the output image
-      cv::Mat contours_mask(cv::Mat::zeros(image_in->image.size(), CV_8UC1));
-      BOOST_FOREACH (const std::vector< cv::Point > &contour, contours) {
+      cv::Mat contours_mask = cv::Mat::zeros(image_in->image.size(), CV_8UC1);
+      for (const std::vector<cv::Point> &contour : contours) {
         if (contour.size() >= 2) {
-          cv::polylines(contours_mask, std::vector< std::vector< cv::Point > >(1, contour),
+          cv::polylines(contours_mask, std::vector<std::vector<cv::Point>>(1, contour),
                         true /* is_closed (e.g. draw line from last to first point) */, 1,
                         line_thickness_);
         }
@@ -110,16 +108,16 @@ private:
               line_transparency_, contours_mask);
 
       // overlay the subscribed name texts on the output image
-      const std::size_t n_texts(std::min(contours.size(), object_msg->names.size()));
-      cv::Mat text_mask(cv::Mat::zeros(image_in->image.size(), CV_8UC1));
+      const std::size_t n_texts = std::min(contours.size(), object_msg->names.size());
+      cv::Mat text_mask = cv::Mat::zeros(image_in->image.size(), CV_8UC1);
       for (std::size_t i = 0; i < n_texts; ++i) {
-        const std::string &text(object_msg->names[i]); // TODO: add probability to text
-        const std::vector< cv::Point > &contour(contours[i]);
+        const std::string &text = object_msg->names[i]; // TODO: add probability to text
+        const std::vector<cv::Point> &contour = contours[i];
         if (!text.empty() && !contour.empty()) {
-          const cv::Rect rect(cv::boundingRect(contour));
-          const cv::Size text_size(cv::getTextSize(text, cv::FONT_HERSHEY_SIMPLEX, font_scale_,
-                                                   text_thickness_,
-                                                   NULL /* baseline (won't use) */));
+          const cv::Rect rect = cv::boundingRect(contour);
+          const cv::Size text_size =
+              cv::getTextSize(text, cv::FONT_HERSHEY_SIMPLEX, font_scale_, text_thickness_,
+                              NULL /* baseline (won't use) */);
           cv::putText(text_mask, text,
                       cv::Point(rect.x + (rect.width - text_size.width) / 2,
                                 rect.y + (rect.height + text_size.height) / 2),
@@ -141,7 +139,7 @@ private:
   // (this function cannot be static member function due to NODELET_XXX macros)
   cv::Scalar colorParam(ros::NodeHandle &nh, const std::string &name,
                         const cv::Scalar &default_val) {
-    std::vector< int > val;
+    std::vector<int> val;
     if (!nh.getParam(name, val)) {
       return default_val;
     }
@@ -178,8 +176,8 @@ private:
   double font_scale_;
 
   image_transport::SubscriberFilter image_subscriber_;
-  message_filters::Subscriber< object_detection_msgs::Objects > object_subscriber_;
-  boost::scoped_ptr< SyncSubscriber > sync_subscriber_;
+  message_filters::Subscriber<object_detection_msgs::Objects> object_subscriber_;
+  std::unique_ptr<SyncSubscriber> sync_subscriber_;
 
   image_transport::Publisher image_publisher_;
 };
